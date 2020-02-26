@@ -17,18 +17,19 @@ import { useFirebase } from '../../../Components/firebaseProvider';
 import useStyles from './styles';
 import { currency } from '../../../utils/formatter';
 import AppPageLoading from '../../../Components/AppLoading';
+import '../../../App.css';
 
-function Home(){
+function Home() {
     const classes = useStyles();
-    const { firestore, user, auth } = useFirebase();
-    const { enqueueSnackBar } = useSnackbar();
-    const todayDateString = format(new Date(), 'yyyy-mm-dd');
-    const productCol = firestore.collection(`store/${user.uid}/product`);
-    const transactionCol = firestore.collection(`store/${user.uid}/transaction`);
+    const { firestore, user } = useFirebase();
+    const { enqueueSnackbar } = useSnackbar();
+    const todayDateString = format(new Date(), `yyyy-mm-dd`);
+    const productCol = firestore.collection(`store/${user.uid}/products`);
+    const transactionCol = firestore.collection(`store/${user.uid}/transactions`);
     const [snapshotProduct, loadingProduct] = useCollection(productCol);
     const [snapshotTransaction, loadingTransaction] = useCollection(transactionCol.where('date', '==', todayDateString));
     const initialTransaction = {
-        no: "",
+        no: '',
         items: {
 
         },
@@ -36,26 +37,13 @@ function Home(){
         date: todayDateString
     };
     const [transaction, setTransaction] = useState(initialTransaction);
-    const [isSubmitting, setSubmitting] = useState(false);
     const [productItems, setProductItems] = useState([]);
     const [filterProduct, setFilterProduct] = useState('');
-    
-    useEffect(() => {
-        if (snapshotProduct) {
-
-            setProductItems(snapshotProduct.docs.filter((productDoc) => {
-               if (filterProduct) {
-                   return productDoc.data().nama.toLowerCase().includes(filterProduct.toLowerCase());
-
-               } 
-               return true;
-            }));
-        }
-    }, [snapshotProduct, filterProduct])
+    const [isSubmitting, setSubmitting] = useState(false);
 
     useEffect(() => {
 
-        if(snapshotTransaction) {
+        if (snapshotTransaction) {
             setTransaction(transaction => ({
                 ...transaction,
                 no: `${transaction.date}/${snapshotTransaction.docs.length + 1}`
@@ -66,255 +54,295 @@ function Home(){
                 no: `${transaction.date}/1`
             }))
         }
+
     }, [snapshotTransaction])
+    useEffect(() => {
+
+        if (snapshotProduct) {
+
+            setProductItems(snapshotProduct.docs.filter((productDoc) => {
+
+                if (filterProduct) {
+                    return productDoc.data().nama.toLowerCase().includes(filterProduct.toLowerCase());
+                }
+
+                return true;
+
+
+            }));
+        }
+    }, [snapshotProduct, filterProduct])
 
     const addItem = productDoc => e => {
         let newItem = { ...transaction.items[productDoc.id] };
         const productData = productDoc.data();
 
-        if(newItem.sum) {
-            newItem.sum = newItem.sum + 1;
-            newItem.subtotal = productData.price * newItem.sum;
+        if (newItem.total) {
+            newItem.total = newItem.total + 1;
+            newItem.subtotal = productData.price * newItem.total;
         } else {
-            newItem.sum = 1;
+            newItem.total = 1;
             newItem.price = productData.price;
             newItem.subtotal = productData.price;
-            newItem.name = productData.name;
+            newItem.nama = productData.nama;
         }
 
         const newItems = {
             ...transaction.items,
             [productDoc.id]: newItem
         };
-        if (newItem.sum > productData.stock) {
-            enqueueSnackBar('Jumlah melebihi stok produk', { variant: 'error' })
+        if (newItem.total > productData.stock) {
+
+            enqueueSnackbar('The amount exceeds the product stock', { variant: 'error' })
         } else {
 
             setTransaction({
                 ...transaction,
-                item: newItems,
+                items: newItems,
                 total: Object.keys(newItems).reduce((total, k) => {
-                    const item = newItem[k];
+                    const item = newItems[k];
                     return total + parseInt(item.subtotal);
                 }, 0)
+
             })
         }
+
+
     }
 
     const handleChangeTotal = k => e => {
-        let newItem = {
-            ...transaction.items
-        };
-        
-        newItem.sum = parseInt(e.target.value);
-        newItem.subtotal = newItem.price * newItem.sum;
-        
-        let newItems = {
+
+        let newItem = { ...transaction.items[k] };
+
+        newItem.total = parseInt(e.target.value);
+        newItem.subtotal = newItem.price * newItem.total;
+
+        const newItems = {
             ...transaction.items,
             [k]: newItem
         };
 
         const productDoc = productItems.find(item => item.id === k);
         const productData = productDoc.data()
-        if (newItem.sum > productData.stock) {
-            enqueueSnackBar('Jumlah melebihi stok produk', { variant: 'error' })
+        if (newItem.total > productData.stock) {
+
+            enqueueSnackbar('The amount exceeds the product stock', { variant: 'error' })
         } else {
+
             setTransaction({
                 ...transaction,
                 items: newItems,
-                total: Object.keys(newItems).reduce((total, k) => { 
+                total: Object.keys(newItems).reduce((total, k) => {
                     const item = newItems[k];
                     return total + parseInt(item.subtotal);
                 }, 0)
+
             })
+
         }
+
     }
-         const saveTransaction = async (e) => {
 
-             if (Object.keys(transaction.items).length <= 0) {
-                 enqueueSnackBar('There is no transaction to save', { variant: 'error' })
-                 return false;
-             }
-         
+    const saveTransaction = async (e) => {
 
-            setSubmitting(true);
-            try {
-                await transactionCol.add({
-                    ...transaction,
-                    timestamp: Date.now()
-                })
+        if (Object.keys(transaction.items).length <= 0) {
+            enqueueSnackbar('There is no transaction to be saved', { variant: 'error' });
+            return false;
+        }
 
-                // update stock produk menggunakan transactions
+        setSubmitting(true);
+        try {
+            await transactionCol.add({
+                ...transaction,
+                timestamp: Date.now()
+            })
 
-                await firestore.runTransaction(transaction => {
-                    const productIDs = Object.keys(transaction.items);
-                    return Promise.all(productIDs.map(productId => {
-                        const productRef = firestore.doc(`store/${user.uid}/product/${productId}`);
+            // update stok produk menggunakan transactions
 
-                        return transaction.get(productRef).then((productDoc) => {
+            await firestore.runTransaction(transactions => {
 
-                            if (!productDoc.exists) {
-                                throw Error('There is no product');
-                            }
+                const productIDs = Object.keys(transaction.items);
 
-                            let newStock = parseInt(productDoc.data().stock) - parseInt(transaction.items[productId].sum);
+                return Promise.all(productIDs.map(productId => {
 
-                            if ( newStock < 0) {
-                                newStock = 0;
-                            }
+                    const productRef = firestore.doc(`store/${user.uid}/products/${productId}`);
 
-                            transaction.update(productRef, { stock: newStock });
-                        })
-                    }));
-                })
+                    return transactions.get(productRef).then((productDoc) => {
 
-                enqueueSnackBar('Transaction has been save', { variant: 'success'})
-                setTransaction(transaction => ({
-                    ...initialTransaction,
-                    no: transaction.no
+                        if (!productDoc.exists) {
+                            throw Error('There is no products');
+                        }
+
+                        let newStock = parseInt(productDoc.data().stock) - parseInt(transaction.items[productId].total);
+
+                        if (newStock < 0) {
+                            newStock = 0;
+                            return false;
+                        }
+
+                        transactions.update(productRef, { stock: newStock });
+
+                    })
                 }));
-            }
-            catch (e) {
-                enqueueSnackBar(e.message, { variant: 'error'});
-            }
+            })
 
-            setSubmitting(false);
+
+            enqueueSnackbar('Transaction has been saved', { variant: 'success' });
+            setTransaction(transaction => ({
+                ...initialTransaction,
+                no: transaction.no
+            }));
+        }
+        catch (e) {
+
+            enqueueSnackbar(e.message, { variant: 'error' });
+        }
+
+        setSubmitting(false);
     }
 
     if (loadingProduct || loadingTransaction) {
-        return <AppPageLoading />
 
+        return <AppPageLoading />
     }
+
 
 
     return (
         <>
-            <Typography variant="h5" component="h1" paragraph>Create New Transactions</Typography>
-            <Grid container spacing={5}>
-                <Grid item xs>
-                    <TextField
-                        label="No Transactions"
-                        value={transaction.no}
-                        InputProps={{
-                            readOnly: true
-                        }}
-                    />
-                </Grid>
-                <Grid item>
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={saveTransaction}
-                        disabled={isSubmitting}
-                    >
-                        <SaveIcon className={classes.iconLeft} />
-                        Save Transaction
-                    </Button>
-                </Grid>
+            <Typography variant="h5" component="h1" paragraph>Create New Transaction</Typography>
+        <Grid container spacing={5}>
+            <Grid item xs>
+                <TextField
+                    label="Transaction No."
+                    value={transaction.no}
+                    InputProps={{
+                        readOnly: true
+                    }}
+                />
             </Grid>
-            <Grid container spacing={5}>
-                <Grid item xs={12} md={8}>
-                    <Table>
-                        <TableHead>
-                            <TableCell>Item</TableCell>
-                            <TableCell>Total</TableCell>
-                            <TableCell>Price</TableCell>
-                            <TableCell>Subtotal</TableCell>
-                        </TableHead>
-                        <TableBody>
-                            {
-                                Object.keys(transaction.items).map(k => {
-                                    const item = transaction.items[k];
-                                    return (
-                                        <TableRow key={k}>
-                                            <TableCell>{item.name}</TableCell>
-                                            <TableCell>
-                                                <TextField
-                                                    disabled={isSubmitting}
-                                                    className={classes.inputJumlah}
-                                                    value={item.sum}
-                                                    type="number"
-                                                    onChange={handleChangeTotal(k)}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                {currency(item.price)}
-                                            </TableCell>
-                                            <TableCell>
-                                                {currency(item.subtotal)}
-                                            </TableCell>
-                                        </TableRow>
-                                    )
-                                })
-                            }
-                            <TableRow>
-                                <TableCell colSpan={3}>
-                                    <Typography variant="subtitle2">
-                                        Total
-                                    </Typography>
-                                </TableCell>
-                                <TableCell>
-                                    <Typography variant="h6">
-                                        {currency(transaction.total)}
-                                    </Typography>
-                                </TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                    <List 
-                        className={classes.listProducts}
-                        component="nav"
-                        subheader={
-                            <ListSubheader component="div">
-                                <TextField
-                                    autoFocus
-                                    label="Search Product"
-                                    fullWidth
-                                    margin="normal"
-                                    onChange={e => { setFilterProduct(e.target.value)}}
-                                />
-                            </ListSubheader>
-                        }
-                    >
-                        {
-                            productItems.map((productDoc) => {
-                                const productData = productDoc.data();
-                                return <ListItem
-                                    key={productDoc.id}
-                                    button
-                                    disabled={!productData.stock || isSubmitting }
-                                    onClick={addItem(productDoc)}
-                                >
-                                    {
-                                        productData.photo ?
-                                            <ListItemAvatar>
-                                                <Avatar
-                                                    src={productData.photo}
-                                                    alt={productData.name}
-                                                />
-                                            </ListItemAvatar>
-                                            :
-                                            <ListItemIcon>
-                                                <ImageIcon />
-                                            </ListItemIcon>
-                                    }
+            <Grid item>
+                <Button
+                    variant="contained"
+                    className={classes.palette}
+                    color="primary"
+                    onClick={saveTransaction}
+                    disabled={isSubmitting}
+                >
+                    <SaveIcon className={classes.iconLeft} />
+                    Save Transaction
+                </Button>
+            </Grid>
+        </Grid>
+        <Grid container spacing={5}>
+            <Grid item xs={12} md={8}>
+                <Table>
+                    <TableHead>
+                        <TableCell>Item</TableCell>
+                        <TableCell>Total</TableCell>
+                        <TableCell>Price</TableCell>
+                        <TableCell>Subtotal</TableCell>
+                    </TableHead>
+                    <TableBody>
 
-                                    <ListItemText
-                                    primary={productData.name}
-                                    secondary={`Stock: ${productData.stock || 0} `}
-                                    />
-                                </ListItem>
+                        {
+                            Object.keys(transaction.items).map(k => {
+
+                                const item = transaction.items[k];
+                                console.log(item)
+                                console.log(transaction.items)
+                                return (
+                                    <TableRow key={k}>
+                                        <TableCell>{item.nama}</TableCell>
+                                        <TableCell>
+
+                                            <TextField
+                                                disabled={isSubmitting}
+                                                className={classes.totalInput}
+                                                value={item.total}
+                                                type="number"
+                                                onChange={handleChangeTotal(k)}
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            {currency(item.price)}
+                                        </TableCell>
+                                        <TableCell>
+                                            {currency(item.subtotal)}
+                                        </TableCell>
+                                    </TableRow>
+                                )
                             })
                         }
-                    </List>
 
-                </Grid>
-
+                        <TableRow>
+                            <TableCell colSpan={3}>
+                                <Typography variant="subtitle2">
+                                    Total
+                                </Typography>
+                            </TableCell>
+                            <TableCell>
+                                <Typography variant="h6">
+                                    {currency(transaction.total)}
+                                </Typography></TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </Grid>
-            <div>halmn Home</div>
-            <Button onClick={(e) => auth.signOut()}>signout</Button>
+            <Grid item
+                xs={12} md={4}>
+                <List
+                    className={classes.listProducts}
+                    component="nav"
+                    subheader={
+                        <ListSubheader component="div">
+                            <TextField
+                                autoFocus
+                                label="Search Product"
+                                fullWidth
+                                margin="normal"
+                                onChange={e => {
+                                    setFilterProduct(e.target.value);
+                                }}
+                            />
+                        </ListSubheader>
+                    }
+                >
+                    {
+                        productItems.map((productDoc) => {
+                            const productData = productDoc.data();
+                            return <ListItem
+                                key={productDoc.id}
+                                button
+                                disabled={!productData.stock || isSubmitting}
+                                onClick={addItem(productDoc)}
+                            >
+
+                                {
+                                    productData.foto ?
+                                        <ListItemAvatar>
+                                            <Avatar
+                                                src={productData.foto}
+                                                alt={productData.nama}
+                                            />
+                                        </ListItemAvatar>
+                                        :
+                                        <ListItemIcon>
+                                            <ImageIcon />
+                                        </ListItemIcon>
+
+                                }
+
+                                <ListItemText
+                                    primary={productData.nama}
+                                    secondary={`Stock: ${productData.stock || 0}`}
+                                />
+                            </ListItem>
+                        })
+                    }
+                </List>
+            </Grid>
+        </Grid>
         </>
     ) 
 }

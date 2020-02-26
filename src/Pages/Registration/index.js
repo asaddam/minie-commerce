@@ -10,6 +10,9 @@ import { Link, Redirect } from 'react-router-dom';
 
 import isEmail from 'validator/lib/isEmail';
 
+import { useSnackbar } from 'notistack';
+
+
 //firebase hook
 import { useFirebase } from '../../Components/firebaseProvider';
 
@@ -98,6 +101,7 @@ function Registration(){
             try {
                 setSubmitting(true);
                 await auth.createUserWithEmailAndPassword(form.email, form.password)
+                
             } catch (e) {
                 const newError = {};
                 switch (e.code) {

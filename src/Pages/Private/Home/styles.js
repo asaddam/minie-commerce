@@ -6,11 +6,15 @@ const useStyles = makeStyles(theme => ({
         maxHeight: 500,
         overflow: 'auto'
     },
-    inputJumlah: {
+    totalInput: {
         width: 35
     },
     iconLeft: {
         marginRight: theme.spacing(1)
+    },
+    palette: {
+        backgroundColor: '#22c906',
+        color: 'white'
     }
 }))
 

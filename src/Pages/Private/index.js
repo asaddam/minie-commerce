@@ -49,8 +49,8 @@ export default function Private() {
                         aria-label="Open drawer"
                         onClick={handleDrawerOpen}
                         className={clsx(classes.menuButton, open && classes.menuButtonHidden)}>
-                            <MenuIcon />
-                        </IconButton>
+                        <MenuIcon />
+                    </IconButton>
                         <Typography component="h1" variant="h6" color="inherit" noWrap className={classes.title}>
                             <Switch>
                                 <Route path="/setting" children="Setting" />

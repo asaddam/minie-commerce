@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 // material-ui
-import TextField from '@material-ui/core/TextField';
-import Button from '@material-ui/core/Button';
+import { TextField, Button } from '@material-ui/core';
 
 // styles
 import useStyles from './styles/store';
@@ -19,7 +18,6 @@ import { useDocument } from 'react-firebase-hooks/firestore';
 import AppPageLoading from '../../../Components/AppLoading';
 
 // react router
-
 import { Prompt } from 'react-router-dom';
 
 function Store() {
@@ -27,17 +25,17 @@ function Store() {
 
     const { firestore, user } = useFirebase();
 
-    const tokoDoc = firestore.doc(`toko/${user.uid}`)
+    const tokoDoc = firestore.doc(`store/${user.uid}`)
     const [snapshot, loading] = useDocument(tokoDoc);
     const { enqueueSnackbar } = useSnackbar();
     const [form, setForm] = useState({
-        name: '',
+        nama: '',
         address: '',
         phone: '',
         website: ''
     })
     const [error, setError] = useState({
-        name: '',
+        nama: '',
         address: '',
         phone: '',
         website: ''
@@ -74,15 +72,15 @@ function Store() {
 
         const newError = { ...error };
 
-        if (!form.name) {
-            newError.name = 'Name must be filled';
+        if (!form.nama) {
+            newError.nama = 'Name must be filled';
         }
 
-        if (!form.alamat) {
+        if (!form.address) {
             newError.address = 'Address must be filled';
         }
 
-        if (!form.telepon) {
+        if (!form.phone) {
             newError.phone = 'Phone must be filled';
         }
 
@@ -109,6 +107,7 @@ function Store() {
                 await tokoDoc.set(form, { merge: true });
                 setSomethingChange(false);
                 enqueueSnackbar('Store data successfully saved.', { variant: 'success' })
+                console.log(form)
             }
             catch (e) {
 
@@ -129,15 +128,15 @@ function Store() {
         <form onSubmit={handleSubmit} noValidate>
             <TextField
                 id="nama"
-                name="name"
+                name="nama"
                 label="Store Name"
                 margin="normal"
-                value={form.name}
+                value={form.nama}
                 required
                 fullWidth
                 onChange={handleChange}
-                error={error.name ? true : false}
-                helperText={error.name}
+                error={error.nama ? true : false}
+                helperText={error.nama}
                 disabled={isSubmitting}
 
             />
